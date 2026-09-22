@@ -1,0 +1,16 @@
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Raw per-service trace output is regenerated every time you run the
+# services or the test suite, so it's ignored rather than committed.
+# traces/example_merged_trace.json is a deliberate exception (see README) --
+# it's a small, static, already-merged example used by viewer/index.html's
+# "Load bundled example trace" button and documented in the README, so it
+# IS committed.
+traces/*.jsonl
+traces/*.log
+!traces/example_merged_trace.json
+
+.DS_Store

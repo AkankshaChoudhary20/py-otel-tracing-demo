@@ -1,0 +1,702 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OTel Trace Waterfall Viewer</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-border: #262b36;
+    --text: #e7e9ee;
+    --text-dim: #9aa3b2;
+    --accent: #5b8cff;
+    --gateway: #5b8cff;
+    --worker: #ff9f5b;
+    --row-alt: #1b1f28;
+    --grid: #2a2f3a;
+    --error: #ff5b6e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  p.sub { color: var(--text-dim); margin: 0 0 20px; font-size: 13px; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .controls label {
+    font-size: 13px;
+    color: var(--text-dim);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  input[type="file"] {
+    color: var(--text);
+    font-size: 13px;
+  }
+  textarea {
+    width: 100%;
+    min-height: 90px;
+    background: #0c0e13;
+    color: var(--text);
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    padding: 8px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+  }
+  button {
+    background: var(--accent);
+    color: #0b0d12;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--panel-border);
+  }
+  .legend { display: flex; gap: 16px; font-size: 12px; color: var(--text-dim); margin-top: 10px; }
+  .legend span.swatch {
+    display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px;
+  }
+  #status { font-size: 13px; color: var(--text-dim); margin-top: 8px; min-height: 18px; }
+  #status.error { color: var(--error); }
+
+  #summary { display: flex; gap: 24px; font-size: 13px; color: var(--text-dim); margin-bottom: 8px; flex-wrap: wrap; }
+  #summary b { color: var(--text); font-weight: 600; }
+
+  .waterfall-wrap { overflow-x: auto; }
+  svg { display: block; }
+  .row-bg { fill: transparent; }
+  .row-bg.alt { fill: var(--row-alt); }
+  .grid-line { stroke: var(--grid); stroke-width: 1; }
+  .span-bar { rx: 3; ry: 3; cursor: pointer; }
+  .span-bar:hover { stroke: #fff; stroke-width: 1; }
+  .span-label {
+    font-size: 11px;
+    fill: var(--text);
+    dominant-baseline: middle;
+    pointer-events: none;
+  }
+  .span-service {
+    font-size: 10px;
+    fill: var(--text-dim);
+    dominant-baseline: middle;
+    pointer-events: none;
+  }
+  .axis-label { font-size: 10px; fill: var(--text-dim); }
+
+  #tooltip {
+    position: fixed;
+    display: none;
+    background: #0c0e13;
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12px;
+    max-width: 420px;
+    pointer-events: none;
+    z-index: 10;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  #tooltip .t-name { font-weight: 700; margin-bottom: 4px; }
+  #tooltip table { border-collapse: collapse; }
+  #tooltip td { padding: 1px 6px 1px 0; vertical-align: top; color: var(--text-dim); }
+  #tooltip td.v { color: var(--text); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  footer { color: var(--text-dim); font-size: 11px; margin-top: 24px; }
+  code { background: #0c0e13; padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+  <h1>OpenTelemetry Trace Waterfall Viewer</h1>
+  <p class="sub">
+    Loads a merged span array (produced by <code>merge_traces.py</code>) and renders it as a Gantt-style
+    waterfall. Fully offline &mdash; no server, no CDN, no charting library.
+  </p>
+
+  <div class="panel">
+    <div class="controls">
+      <label>
+        Load merged trace JSON file
+        <input type="file" id="fileInput" accept="application/json,.json">
+      </label>
+      <button id="loadExampleBtn" class="secondary">Load bundled example trace</button>
+      <button id="pasteToggleBtn" class="secondary">Paste JSON instead</button>
+    </div>
+    <div id="pasteArea" style="display:none; margin-top: 12px;">
+      <textarea id="pasteInput" placeholder='Paste the JSON array produced by "python merge_traces.py &lt;trace_id&gt;" here'></textarea>
+      <div style="margin-top: 8px;">
+        <button id="renderPasteBtn">Render pasted JSON</button>
+      </div>
+    </div>
+    <div class="legend">
+      <div><span class="swatch" style="background: var(--gateway)"></span>gateway</div>
+      <div><span class="swatch" style="background: var(--worker)"></span>worker</div>
+      <div><span class="swatch" style="background: var(--error)"></span>error span</div>
+    </div>
+    <div id="status"></div>
+  </div>
+
+  <div class="panel" id="summaryPanel" style="display:none;">
+    <div id="summary"></div>
+    <div class="waterfall-wrap">
+      <svg id="chart"></svg>
+    </div>
+  </div>
+
+  <div id="tooltip"></div>
+
+  <footer>
+    Expected input shape: a JSON array of span objects with
+    <code>trace_id, span_id, parent_span_id, name, service_name, kind, start_time_unix_nano, end_time_unix_nano, duration_ms, status, attributes</code>
+    &mdash; exactly what <code>merge_traces.py</code> writes. Generate one with:
+    <code>python merge_traces.py &lt;trace_id&gt; -o mytrace.json</code>, then load that file above.
+  </footer>
+
+<script>
+(function () {
+  "use strict";
+
+  const fileInput = document.getElementById("fileInput");
+  const loadExampleBtn = document.getElementById("loadExampleBtn");
+  const pasteToggleBtn = document.getElementById("pasteToggleBtn");
+  const pasteArea = document.getElementById("pasteArea");
+  const pasteInput = document.getElementById("pasteInput");
+  const renderPasteBtn = document.getElementById("renderPasteBtn");
+  const statusEl = document.getElementById("status");
+  const summaryPanel = document.getElementById("summaryPanel");
+  const summaryEl = document.getElementById("summary");
+  const svg = document.getElementById("chart");
+  const tooltip = document.getElementById("tooltip");
+
+  const SERVICE_COLORS = {
+    gateway: "var(--gateway)",
+    worker: "var(--worker)",
+  };
+  const FALLBACK_COLOR = "#8a8fbf";
+
+  function setStatus(msg, isError) {
+    statusEl.textContent = msg || "";
+    statusEl.className = isError ? "error" : "";
+  }
+
+  function svgEl(tag, attrs) {
+    const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  }
+
+  // Bundled example trace (same content as traces/example_merged_trace.json)
+  // so the viewer is demonstrable without needing a file picker dialog.
+  const BUNDLED_EXAMPLE = [
+  {
+    "name": "POST /checkout",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "c5835bfde7f186b8",
+    "parent_span_id": null,
+    "kind": "SERVER",
+    "start_time_unix_nano": 1790055078878577000,
+    "end_time_unix_nano": 1790055078987839000,
+    "duration_ms": 109.262,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "http.scheme": "http",
+      "http.host": "127.0.0.1:8000",
+      "net.host.port": 8000,
+      "http.flavor": "1.1",
+      "http.target": "/checkout",
+      "http.url": "http://127.0.0.1:8000/checkout",
+      "http.method": "POST",
+      "http.server_name": "127.0.0.1:8000",
+      "http.user_agent": "curl/8.1.2",
+      "net.peer.ip": "127.0.0.1",
+      "net.peer.port": 49945,
+      "http.route": "/checkout",
+      "http.status_code": 200
+    },
+    "service_name": "gateway"
+  },
+  {
+    "name": "POST /checkout http receive",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "2872a63e4bdea7c2",
+    "parent_span_id": "c5835bfde7f186b8",
+    "kind": "INTERNAL",
+    "start_time_unix_nano": 1790055078879013000,
+    "end_time_unix_nano": 1790055078879033000,
+    "duration_ms": 0.02,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "asgi.event.type": "http.request"
+    },
+    "service_name": "gateway"
+  },
+  {
+    "name": "checkout.handle_order",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "e3db07e3190045c1",
+    "parent_span_id": "c5835bfde7f186b8",
+    "kind": "INTERNAL",
+    "start_time_unix_nano": 1790055078879549000,
+    "end_time_unix_nano": 1790055078987258000,
+    "duration_ms": 107.709,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "order.id": "f9294790-8fdb-443b-b738-2e06779383dd",
+      "order.item_count": 2
+    },
+    "service_name": "gateway"
+  },
+  {
+    "name": "POST",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "8d7c24ce300af66a",
+    "parent_span_id": "e3db07e3190045c1",
+    "kind": "CLIENT",
+    "start_time_unix_nano": 1790055078912345000,
+    "end_time_unix_nano": 1790055078986784000,
+    "duration_ms": 74.439,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "http.method": "POST",
+      "http.url": "http://127.0.0.1:8001/work",
+      "http.status_code": 200
+    },
+    "service_name": "gateway"
+  },
+  {
+    "name": "POST /work",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "3615c1b6a123a8c1",
+    "parent_span_id": "8d7c24ce300af66a",
+    "kind": "SERVER",
+    "start_time_unix_nano": 1790055078913026000,
+    "end_time_unix_nano": 1790055078986340000,
+    "duration_ms": 73.314,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "http.scheme": "http",
+      "http.host": "127.0.0.1:8001",
+      "net.host.port": 8001,
+      "http.flavor": "1.1",
+      "http.target": "/work",
+      "http.url": "http://127.0.0.1:8001/work",
+      "http.method": "POST",
+      "http.server_name": "127.0.0.1:8001",
+      "http.user_agent": "python-httpx/0.28.1",
+      "net.peer.ip": "127.0.0.1",
+      "net.peer.port": 49946,
+      "http.route": "/work",
+      "http.status_code": 200
+    },
+    "service_name": "worker"
+  },
+  {
+    "name": "POST /work http receive",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "3e29fd5ceaffe3b4",
+    "parent_span_id": "3615c1b6a123a8c1",
+    "kind": "INTERNAL",
+    "start_time_unix_nano": 1790055078913250000,
+    "end_time_unix_nano": 1790055078913285000,
+    "duration_ms": 0.035,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "asgi.event.type": "http.request"
+    },
+    "service_name": "worker"
+  },
+  {
+    "name": "compute.checksum",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "31c71e9bd6f8d434",
+    "parent_span_id": "3615c1b6a123a8c1",
+    "kind": "INTERNAL",
+    "start_time_unix_nano": 1790055078942792000,
+    "end_time_unix_nano": 1790055078960359000,
+    "duration_ms": 17.567,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "compute.item_count": 2,
+      "compute.result": 19200129
+    },
+    "service_name": "worker"
+  },
+  {
+    "name": "db.query.insert_order",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "9853d783fc61c898",
+    "parent_span_id": "3615c1b6a123a8c1",
+    "kind": "INTERNAL",
+    "start_time_unix_nano": 1790055078960595000,
+    "end_time_unix_nano": 1790055078985627000,
+    "duration_ms": 25.032,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "db.system": "postgresql",
+      "db.statement": "INSERT INTO orders (id, items) VALUES ($1, $2)",
+      "db.order_id": "f9294790-8fdb-443b-b738-2e06779383dd",
+      "db.rows_affected": 2
+    },
+    "service_name": "worker"
+  },
+  {
+    "name": "POST /work http send",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "5699ddf1f2eb4ec0",
+    "parent_span_id": "3615c1b6a123a8c1",
+    "kind": "INTERNAL",
+    "start_time_unix_nano": 1790055078986041000,
+    "end_time_unix_nano": 1790055078986058000,
+    "duration_ms": 0.017,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "asgi.event.type": "http.response.start",
+      "http.status_code": 200
+    },
+    "service_name": "worker"
+  },
+  {
+    "name": "POST /work http send",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "1e79b7010814029a",
+    "parent_span_id": "3615c1b6a123a8c1",
+    "kind": "INTERNAL",
+    "start_time_unix_nano": 1790055078986211000,
+    "end_time_unix_nano": 1790055078986225000,
+    "duration_ms": 0.014,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "asgi.event.type": "http.response.body"
+    },
+    "service_name": "worker"
+  },
+  {
+    "name": "POST /checkout http send",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "9c3f183fdf31b217",
+    "parent_span_id": "c5835bfde7f186b8",
+    "kind": "INTERNAL",
+    "start_time_unix_nano": 1790055078987582000,
+    "end_time_unix_nano": 1790055078987595000,
+    "duration_ms": 0.013,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "asgi.event.type": "http.response.start",
+      "http.status_code": 200
+    },
+    "service_name": "gateway"
+  },
+  {
+    "name": "POST /checkout http send",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "743ae6dc0cc5ae02",
+    "parent_span_id": "c5835bfde7f186b8",
+    "kind": "INTERNAL",
+    "start_time_unix_nano": 1790055078987732000,
+    "end_time_unix_nano": 1790055078987738000,
+    "duration_ms": 0.006,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "asgi.event.type": "http.response.body"
+    },
+    "service_name": "gateway"
+  }
+];
+
+  function loadSpans(spans) {
+    if (!Array.isArray(spans) || spans.length === 0) {
+      setStatus("Input must be a non-empty JSON array of spans.", true);
+      return;
+    }
+    try {
+      render(spans);
+      setStatus(`Loaded ${spans.length} spans.`, false);
+    } catch (err) {
+      console.error(err);
+      setStatus("Failed to render: " + err.message, true);
+    }
+  }
+
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        loadSpans(data);
+      } catch (err) {
+        setStatus("Invalid JSON file: " + err.message, true);
+      }
+    };
+    reader.onerror = () => setStatus("Could not read file.", true);
+    reader.readAsText(file);
+  });
+
+  loadExampleBtn.addEventListener("click", () => {
+    loadSpans(JSON.parse(JSON.stringify(BUNDLED_EXAMPLE)));
+  });
+
+  pasteToggleBtn.addEventListener("click", () => {
+    pasteArea.style.display = pasteArea.style.display === "none" ? "block" : "none";
+  });
+
+  renderPasteBtn.addEventListener("click", () => {
+    try {
+      const data = JSON.parse(pasteInput.value);
+      loadSpans(data);
+    } catch (err) {
+      setStatus("Invalid pasted JSON: " + err.message, true);
+    }
+  });
+
+  function serviceColor(name) {
+    return SERVICE_COLORS[name] || FALLBACK_COLOR;
+  }
+
+  function fmtNs(ns) {
+    // ns since epoch -> readable local time with ms
+    const ms = ns / 1e6;
+    const d = new Date(ms);
+    return d.toISOString().replace("T", " ").replace("Z", "");
+  }
+
+  function render(spans) {
+    // sort by start time, but keep a stable depth-first-ish order by
+    // walking the parent/child tree so children render under parents.
+    const byId = {};
+    spans.forEach((s) => { byId[s.span_id] = s; });
+
+    const childrenOf = {};
+    spans.forEach((s) => {
+      const p = s.parent_span_id || "__root__";
+      (childrenOf[p] = childrenOf[p] || []).push(s);
+    });
+    Object.values(childrenOf).forEach((list) =>
+      list.sort((a, b) => (a.start_time_unix_nano || 0) - (b.start_time_unix_nano || 0))
+    );
+
+    const ordered = [];
+    const depthOf = {};
+    function walk(id, depth) {
+      const kids = childrenOf[id] || [];
+      kids.forEach((s) => {
+        depthOf[s.span_id] = depth;
+        ordered.push(s);
+        walk(s.span_id, depth + 1);
+      });
+    }
+    walk("__root__", 0);
+    // any spans whose parent wasn't in this set (orphans) still get shown
+    spans.forEach((s) => {
+      if (!ordered.includes(s)) {
+        depthOf[s.span_id] = 0;
+        ordered.push(s);
+      }
+    });
+
+    const minStart = Math.min(...spans.map((s) => s.start_time_unix_nano || 0));
+    const maxEnd = Math.max(...spans.map((s) => s.end_time_unix_nano || 0));
+    const totalNs = Math.max(maxEnd - minStart, 1);
+
+    const traceIds = new Set(spans.map((s) => s.trace_id));
+    const services = new Set(spans.map((s) => s.service_name));
+    summaryEl.innerHTML =
+      `<div>trace_id: <b>${[...traceIds].join(", ")}</b></div>` +
+      `<div>services: <b>${[...services].join(", ")}</b></div>` +
+      `<div>spans: <b>${spans.length}</b></div>` +
+      `<div>total duration: <b>${(totalNs / 1e6).toFixed(3)} ms</b></div>`;
+    summaryPanel.style.display = "block";
+
+    // --- layout constants ---
+    const rowHeight = 28;
+    const labelColWidth = 260;
+    const chartPad = 20;
+    const topPad = 30;
+    const width = Math.max(900, labelColWidth + 700);
+    const timelineWidth = width - labelColWidth - chartPad * 2;
+    const height = topPad + ordered.length * rowHeight + 20;
+
+    svg.setAttribute("width", width);
+    svg.setAttribute("height", height);
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    svg.innerHTML = "";
+
+    function xForTime(ns) {
+      return labelColWidth + chartPad + ((ns - minStart) / totalNs) * timelineWidth;
+    }
+    function widthForDuration(startNs, endNs) {
+      return Math.max(((endNs - startNs) / totalNs) * timelineWidth, 1.5);
+    }
+
+    // gridlines every ~10% of total duration
+    const gridSteps = 10;
+    for (let i = 0; i <= gridSteps; i++) {
+      const ns = minStart + (totalNs * i) / gridSteps;
+      const x = xForTime(ns);
+      svg.appendChild(
+        svgEl("line", {
+          x1: x, x2: x, y1: topPad - 10, y2: height - 10,
+          class: "grid-line",
+        })
+      );
+      const label = ((ns - minStart) / 1e6).toFixed(1) + "ms";
+      const t = svgEl("text", { x: x + 2, y: topPad - 14, class: "axis-label" });
+      t.textContent = label;
+      svg.appendChild(t);
+    }
+
+    ordered.forEach((span, i) => {
+      const y = topPad + i * rowHeight;
+      if (i % 2 === 1) {
+        svg.appendChild(
+          svgEl("rect", { x: 0, y, width, height: rowHeight, class: "row-bg alt" })
+        );
+      }
+
+      const depth = depthOf[span.span_id] || 0;
+      const labelX = 8 + depth * 14;
+      const nameText = svgEl("text", {
+        x: labelX, y: y + rowHeight / 2 - 6, class: "span-label",
+      });
+      nameText.textContent = span.name;
+      svg.appendChild(nameText);
+
+      const svcText = svgEl("text", {
+        x: labelX, y: y + rowHeight / 2 + 8, class: "span-service",
+      });
+      svcText.textContent = `${span.service_name || "?"} · ${span.kind || ""}`;
+      svg.appendChild(svcText);
+
+      const start = span.start_time_unix_nano || minStart;
+      const end = span.end_time_unix_nano || start;
+      const barX = xForTime(start);
+      const barW = widthForDuration(start, end);
+      const isError =
+        span.status && span.status.status_code && span.status.status_code === "ERROR";
+
+      const bar = svgEl("rect", {
+        x: barX,
+        y: y + 5,
+        width: barW,
+        height: rowHeight - 10,
+        class: "span-bar",
+        fill: isError ? "var(--error)" : serviceColor(span.service_name),
+        opacity: span.kind === "INTERNAL" ? 0.75 : 1,
+      });
+      svg.appendChild(bar);
+
+      bar.addEventListener("mousemove", (evt) => showTooltip(evt, span));
+      bar.addEventListener("mouseleave", hideTooltip);
+    });
+  }
+
+  function showTooltip(evt, span) {
+    const dur = span.duration_ms != null ? span.duration_ms.toFixed(3) + " ms" : "?";
+    const attrs = span.attributes || {};
+    const attrRows = Object.keys(attrs)
+      .map((k) => `<tr><td>${escapeHtml(k)}</td><td class="v">${escapeHtml(String(attrs[k]))}</td></tr>`)
+      .join("");
+    tooltip.innerHTML = `
+      <div class="t-name">${escapeHtml(span.name)}</div>
+      <table>
+        <tr><td>service</td><td class="v">${escapeHtml(span.service_name || "")}</td></tr>
+        <tr><td>kind</td><td class="v">${escapeHtml(span.kind || "")}</td></tr>
+        <tr><td>span_id</td><td class="v">${escapeHtml(span.span_id || "")}</td></tr>
+        <tr><td>parent_span_id</td><td class="v">${escapeHtml(span.parent_span_id || "(root)")}</td></tr>
+        <tr><td>trace_id</td><td class="v">${escapeHtml(span.trace_id || "")}</td></tr>
+        <tr><td>start</td><td class="v">${escapeHtml(fmtNs(span.start_time_unix_nano))}</td></tr>
+        <tr><td>duration</td><td class="v">${dur}</td></tr>
+        ${attrRows}
+      </table>`;
+    tooltip.style.display = "block";
+    positionTooltip(evt);
+  }
+
+  function positionTooltip(evt) {
+    const pad = 14;
+    let x = evt.clientX + pad;
+    let y = evt.clientY + pad;
+    const rect = tooltip.getBoundingClientRect();
+    if (x + rect.width > window.innerWidth) x = evt.clientX - rect.width - pad;
+    if (y + rect.height > window.innerHeight) y = evt.clientY - rect.height - pad;
+    tooltip.style.left = x + "px";
+    tooltip.style.top = y + "px";
+  }
+
+  document.addEventListener("mousemove", (evt) => {
+    if (tooltip.style.display === "block") positionTooltip(evt);
+  });
+
+  function hideTooltip() {
+    tooltip.style.display = "none";
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
+  }
+})();
+</script>
+</body>
+</html>

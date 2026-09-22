@@ -1,0 +1,251 @@
+[
+  {
+    "name": "POST /checkout",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "c5835bfde7f186b8",
+    "parent_span_id": null,
+    "kind": "SERVER",
+    "start_time_unix_nano": 1790055078878577000,
+    "end_time_unix_nano": 1790055078987839000,
+    "duration_ms": 109.262,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "http.scheme": "http",
+      "http.host": "127.0.0.1:8000",
+      "net.host.port": 8000,
+      "http.flavor": "1.1",
+      "http.target": "/checkout",
+      "http.url": "http://127.0.0.1:8000/checkout",
+      "http.method": "POST",
+      "http.server_name": "127.0.0.1:8000",
+      "http.user_agent": "curl/8.1.2",
+      "net.peer.ip": "127.0.0.1",
+      "net.peer.port": 49945,
+      "http.route": "/checkout",
+      "http.status_code": 200
+    },
+    "service_name": "gateway"
+  },
+  {
+    "name": "POST /checkout http receive",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "2872a63e4bdea7c2",
+    "parent_span_id": "c5835bfde7f186b8",
+    "kind": "INTERNAL",
+    "start_time_unix_nano": 1790055078879013000,
+    "end_time_unix_nano": 1790055078879033000,
+    "duration_ms": 0.02,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "asgi.event.type": "http.request"
+    },
+    "service_name": "gateway"
+  },
+  {
+    "name": "checkout.handle_order",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "e3db07e3190045c1",
+    "parent_span_id": "c5835bfde7f186b8",
+    "kind": "INTERNAL",
+    "start_time_unix_nano": 1790055078879549000,
+    "end_time_unix_nano": 1790055078987258000,
+    "duration_ms": 107.709,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "order.id": "f9294790-8fdb-443b-b738-2e06779383dd",
+      "order.item_count": 2
+    },
+    "service_name": "gateway"
+  },
+  {
+    "name": "POST",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "8d7c24ce300af66a",
+    "parent_span_id": "e3db07e3190045c1",
+    "kind": "CLIENT",
+    "start_time_unix_nano": 1790055078912345000,
+    "end_time_unix_nano": 1790055078986784000,
+    "duration_ms": 74.439,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "http.method": "POST",
+      "http.url": "http://127.0.0.1:8001/work",
+      "http.status_code": 200
+    },
+    "service_name": "gateway"
+  },
+  {
+    "name": "POST /work",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "3615c1b6a123a8c1",
+    "parent_span_id": "8d7c24ce300af66a",
+    "kind": "SERVER",
+    "start_time_unix_nano": 1790055078913026000,
+    "end_time_unix_nano": 1790055078986340000,
+    "duration_ms": 73.314,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "http.scheme": "http",
+      "http.host": "127.0.0.1:8001",
+      "net.host.port": 8001,
+      "http.flavor": "1.1",
+      "http.target": "/work",
+      "http.url": "http://127.0.0.1:8001/work",
+      "http.method": "POST",
+      "http.server_name": "127.0.0.1:8001",
+      "http.user_agent": "python-httpx/0.28.1",
+      "net.peer.ip": "127.0.0.1",
+      "net.peer.port": 49946,
+      "http.route": "/work",
+      "http.status_code": 200
+    },
+    "service_name": "worker"
+  },
+  {
+    "name": "POST /work http receive",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "3e29fd5ceaffe3b4",
+    "parent_span_id": "3615c1b6a123a8c1",
+    "kind": "INTERNAL",
+    "start_time_unix_nano": 1790055078913250000,
+    "end_time_unix_nano": 1790055078913285000,
+    "duration_ms": 0.035,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "asgi.event.type": "http.request"
+    },
+    "service_name": "worker"
+  },
+  {
+    "name": "compute.checksum",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "31c71e9bd6f8d434",
+    "parent_span_id": "3615c1b6a123a8c1",
+    "kind": "INTERNAL",
+    "start_time_unix_nano": 1790055078942792000,
+    "end_time_unix_nano": 1790055078960359000,
+    "duration_ms": 17.567,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "compute.item_count": 2,
+      "compute.result": 19200129
+    },
+    "service_name": "worker"
+  },
+  {
+    "name": "db.query.insert_order",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "9853d783fc61c898",
+    "parent_span_id": "3615c1b6a123a8c1",
+    "kind": "INTERNAL",
+    "start_time_unix_nano": 1790055078960595000,
+    "end_time_unix_nano": 1790055078985627000,
+    "duration_ms": 25.032,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "db.system": "postgresql",
+      "db.statement": "INSERT INTO orders (id, items) VALUES ($1, $2)",
+      "db.order_id": "f9294790-8fdb-443b-b738-2e06779383dd",
+      "db.rows_affected": 2
+    },
+    "service_name": "worker"
+  },
+  {
+    "name": "POST /work http send",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "5699ddf1f2eb4ec0",
+    "parent_span_id": "3615c1b6a123a8c1",
+    "kind": "INTERNAL",
+    "start_time_unix_nano": 1790055078986041000,
+    "end_time_unix_nano": 1790055078986058000,
+    "duration_ms": 0.017,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "asgi.event.type": "http.response.start",
+      "http.status_code": 200
+    },
+    "service_name": "worker"
+  },
+  {
+    "name": "POST /work http send",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "1e79b7010814029a",
+    "parent_span_id": "3615c1b6a123a8c1",
+    "kind": "INTERNAL",
+    "start_time_unix_nano": 1790055078986211000,
+    "end_time_unix_nano": 1790055078986225000,
+    "duration_ms": 0.014,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "asgi.event.type": "http.response.body"
+    },
+    "service_name": "worker"
+  },
+  {
+    "name": "POST /checkout http send",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "9c3f183fdf31b217",
+    "parent_span_id": "c5835bfde7f186b8",
+    "kind": "INTERNAL",
+    "start_time_unix_nano": 1790055078987582000,
+    "end_time_unix_nano": 1790055078987595000,
+    "duration_ms": 0.013,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "asgi.event.type": "http.response.start",
+      "http.status_code": 200
+    },
+    "service_name": "gateway"
+  },
+  {
+    "name": "POST /checkout http send",
+    "trace_id": "ad82afd73c6a40ab21de102943a57476",
+    "span_id": "743ae6dc0cc5ae02",
+    "parent_span_id": "c5835bfde7f186b8",
+    "kind": "INTERNAL",
+    "start_time_unix_nano": 1790055078987732000,
+    "end_time_unix_nano": 1790055078987738000,
+    "duration_ms": 0.006,
+    "status": {
+      "status_code": "UNSET",
+      "description": null
+    },
+    "attributes": {
+      "asgi.event.type": "http.response.body"
+    },
+    "service_name": "gateway"
+  }
+]
