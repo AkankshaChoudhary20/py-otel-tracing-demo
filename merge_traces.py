@@ -32,11 +32,17 @@ def read_spans(paths: Iterable[Path]) -> list[dict]:
         if not path.exists():
             continue
         with open(path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
+            for line_number, raw_line in enumerate(f, 1):
+                line = raw_line.strip()
                 if not line:
                     continue
-                spans.append(json.loads(line))
+                try:
+                    spans.append(json.loads(line))
+                except json.JSONDecodeError as error:
+                    if not raw_line.endswith('\n'):
+                        # Exporters may still be writing the final JSONL record.
+                        continue
+                    raise ValueError(f"Invalid span JSON at {path}:{line_number}") from error
     return spans
 
 
