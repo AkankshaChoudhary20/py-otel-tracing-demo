@@ -37,7 +37,10 @@ def read_spans(paths: Iterable[Path]) -> list[dict]:
                 if not line:
                     continue
                 try:
-                    spans.append(json.loads(line))
+                    span = json.loads(line)
+                    if not isinstance(span, dict):
+                        raise ValueError(f"Span must be a JSON object at {path}:{line_number}")
+                    spans.append(span)
                 except json.JSONDecodeError as error:
                     if not raw_line.endswith('\n'):
                         # Exporters may still be writing the final JSONL record.
