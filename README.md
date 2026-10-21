@@ -254,3 +254,9 @@ the test suite. `traces/example_merged_trace.json` is the one deliberate
 exception: it's a small, static, already-merged example (produced once via
 `merge_traces.py` from a real local run) that's committed so the viewer has
 something to show out of the box.
+
+## Continuous integration
+
+CI uses Python 3.14, installs `requirements.txt`, checks dependency compatibility with `pip check`, and runs the complete pytest suite. This includes the real gateway-to-worker HTTP trace propagation test; services are started and stopped by its fixture.
+
+Checks run on pushes and pull requests and can be started manually from the Actions tab. The workflow has read-only repository permissions, cancels superseded runs, and stops after 15 minutes.
