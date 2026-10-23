@@ -90,12 +90,15 @@ def main() -> None:
 
     paths = [Path(p) for p in args.files] if args.files else DEFAULT_FILES
 
-    if args.list:
-        for tid in list_trace_ids(paths):
-            print(tid)
-        return
+    try:
+        if args.list:
+            for tid in list_trace_ids(paths):
+                print(tid)
+            return
 
-    merged = merge(args.trace_id, paths)
+        merged = merge(args.trace_id, paths)
+    except (ValueError, OSError) as error:
+        parser.error(str(error))
 
     if not merged:
         print("No matching spans found.", file=sys.stderr)
