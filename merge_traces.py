@@ -50,6 +50,7 @@ def read_spans(paths: Iterable[Path]) -> list[dict]:
 
 
 def most_recent_trace_id(spans: list[dict]) -> str | None:
+    spans = [s for s in spans if isinstance(s.get("trace_id"), str) and s["trace_id"].strip()]
     if not spans:
         return None
     latest = max(spans, key=lambda s: s.get("start_time_unix_nano") or 0)
@@ -71,7 +72,9 @@ def list_trace_ids(paths: Iterable[Path]) -> list[str]:
     spans = read_spans(paths)
     seen: dict[str, None] = {}
     for s in sorted(spans, key=lambda s: s.get("start_time_unix_nano") or 0):
-        seen.setdefault(s.get("trace_id"), None)
+        trace_id = s.get("trace_id")
+        if isinstance(trace_id, str) and trace_id.strip():
+            seen.setdefault(trace_id, None)
     return list(seen.keys())
 
 
