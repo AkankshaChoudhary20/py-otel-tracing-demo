@@ -43,6 +43,11 @@ def read_spans(paths: Iterable[Path]) -> list[dict]:
                     timestamp = span.get("start_time_unix_nano")
                     if timestamp is not None and (type(timestamp) is not int or timestamp < 0):
                         raise ValueError(f"Invalid span start timestamp at {path}:{line_number}")
+                    end = span.get("end_time_unix_nano")
+                    if end is not None and (type(end) is not int or end < 0):
+                        raise ValueError(f"Invalid span end timestamp at {path}:{line_number}")
+                    if timestamp is not None and end is not None and end < timestamp:
+                        raise ValueError(f"Span ends before it starts at {path}:{line_number}")
                     spans.append(span)
                 except json.JSONDecodeError as error:
                     if not raw_line.endswith('\n'):
