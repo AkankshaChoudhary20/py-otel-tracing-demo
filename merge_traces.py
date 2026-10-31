@@ -26,6 +26,15 @@ TRACES_DIR = PROJECT_ROOT / "traces"
 DEFAULT_FILES = [TRACES_DIR / "gateway.jsonl", TRACES_DIR / "worker.jsonl"]
 
 
+def _unique_span_fields(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"Duplicate span JSON field: {key}")
+        result[key] = value
+    return result
+
+
 def read_spans(paths: Iterable[Path]) -> list[dict]:
     spans = []
     for path in paths:
@@ -37,7 +46,7 @@ def read_spans(paths: Iterable[Path]) -> list[dict]:
                 if not line:
                     continue
                 try:
-                    span = json.loads(line)
+                    span = json.loads(line, object_pairs_hook=_unique_span_fields)
                     if not isinstance(span, dict):
                         raise ValueError(f"Span must be a JSON object at {path}:{line_number}")
                     timestamp = span.get("start_time_unix_nano")
@@ -54,6 +63,8 @@ def read_spans(paths: Iterable[Path]) -> list[dict]:
                         # Exporters may still be writing the final JSONL record.
                         continue
                     raise ValueError(f"Invalid span JSON at {path}:{line_number}") from error
+                except ValueError as error:
+                    raise ValueError(f"Invalid span at {path}:{line_number}: {error}") from error
     return spans
 
 
