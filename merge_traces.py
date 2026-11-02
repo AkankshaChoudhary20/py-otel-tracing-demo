@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Iterable
@@ -35,6 +36,13 @@ def _unique_span_fields(pairs):
     return result
 
 
+def _finite_span_number(text):
+    value = float(text)
+    if not math.isfinite(value):
+        raise ValueError(f"Span JSON number must be finite: {text}")
+    return value
+
+
 def read_spans(paths: Iterable[Path]) -> list[dict]:
     spans = []
     for path in paths:
@@ -46,7 +54,8 @@ def read_spans(paths: Iterable[Path]) -> list[dict]:
                 if not line:
                     continue
                 try:
-                    span = json.loads(line, object_pairs_hook=_unique_span_fields)
+                    span = json.loads(line, object_pairs_hook=_unique_span_fields,
+                                      parse_float=_finite_span_number, parse_constant=_finite_span_number)
                     if not isinstance(span, dict):
                         raise ValueError(f"Span must be a JSON object at {path}:{line_number}")
                     timestamp = span.get("start_time_unix_nano")
