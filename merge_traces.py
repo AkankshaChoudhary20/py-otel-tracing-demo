@@ -48,7 +48,7 @@ def read_spans(paths: Iterable[Path]) -> list[dict]:
     for path in paths:
         if not path.exists():
             continue
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8-sig") as f:
             for line_number, raw_line in enumerate(f, 1):
                 line = raw_line.strip()
                 if not line:
