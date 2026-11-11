@@ -137,7 +137,10 @@ def main() -> None:
 
     output_json = json.dumps(merged, indent=2)
     if args.output:
-        Path(args.output).write_text(output_json)
+        try:
+            Path(args.output).write_text(output_json, encoding="utf-8")
+        except OSError as error:
+            parser.error(f"could not write output: {error}")
         print(f"Wrote {len(merged)} spans to {args.output}", file=sys.stderr)
     else:
         print(output_json)
